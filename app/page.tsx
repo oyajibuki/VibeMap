@@ -4,7 +4,7 @@ import { useState } from "react";
 import FolderScanner from "@/components/FolderScanner";
 import ArchDiagram from "@/components/ArchDiagram";
 import ResultsPanel from "@/components/ResultsPanel";
-import ApiKeySettings, { useGeminiApiKey } from "@/components/ApiKeySettings";
+import ApiKeySettings, { getGeminiApiKey } from "@/components/ApiKeySettings";
 import type { AnalysisResult, AnalysisData } from "@/lib/analyzer";
 import type { PatternMatch } from "@/lib/patterns";
 import type { FileAnalysis } from "@/app/api/code-analyze/route";
@@ -19,7 +19,6 @@ export interface ScanResult {
 }
 
 export default function Home() {
-  const { apiKey } = useGeminiApiKey();
   const [step, setStep] = useState<Step>("input");
   const [result, setResult] = useState<ScanResult | null>(null);
   const [aiReport, setAiReport] = useState<string | null>(null);
@@ -62,6 +61,7 @@ export default function Home() {
 
   const handleAiEvaluate = async () => {
     if (!result) return;
+    const apiKey = getGeminiApiKey();
     if (!apiKey) {
       alert("AIレポートを使うにはGemini APIキーを設定してください（ヘッダーの🔑ボタン）");
       return;
@@ -97,6 +97,7 @@ export default function Home() {
 
   const handleCodeAnalyze = async () => {
     if (!coreFileContents || !result) return;
+    const apiKey = getGeminiApiKey();
     if (!apiKey) {
       alert("コード解析を使うにはGemini APIキーを設定してください（ヘッダーの🔑ボタン）");
       return;

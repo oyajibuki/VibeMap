@@ -2,7 +2,12 @@
 
 import { useState, useEffect, useRef } from "react";
 
-const STORAGE_KEY = "vibemap_gemini_api_key";
+export const STORAGE_KEY = "vibemap_gemini_api_key";
+
+export const getGeminiApiKey = () => {
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem(STORAGE_KEY) ?? "";
+};
 
 export function useGeminiApiKey() {
   const [apiKey, setApiKey] = useState<string>("");
