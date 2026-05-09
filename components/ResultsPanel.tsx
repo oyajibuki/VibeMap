@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import type { ScanResult } from "@/app/page";
 import type { FileAnalysis } from "@/app/api/code-analyze/route";
+import { getGeminiApiKey } from "@/components/ApiKeySettings";
 
 interface Props {
   result: ScanResult;
@@ -15,6 +16,7 @@ interface Props {
   codeAnalysisLoading: boolean;
   codeAnalysisError: string | null;
   onCodeAnalyze: () => void;
+  coreFileContents?: Record<string, string>;
 }
 
 function ScoreBar({ score }: { score: number }) {
@@ -63,8 +65,7 @@ function MarkdownReport({ text }: { text: string }) {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim();
-    
-    // Table detection
+
     if (line.startsWith("|") && line.endsWith("|")) {
       const cells = line.split("|").filter((_, i, arr) => i > 0 && i < arr.length - 1);
       currentTable.push(cells);
@@ -106,38 +107,76 @@ function formatInline(text: string): string {
     .replace(/`(.+?)`/g, '<code class="bg-slate-800 text-blue-300 px-1 rounded text-xs font-mono">$1</code>');
 }
 
-function CopyableCode({ code, label }: { code: string; label: string }) {
+// ① DLボタン + 推奨文言
+function CopyableCode({ code, label, filename }: { code: string; label: string; filename?: string }) {
   const [copied, setCopied] = useState(false);
+
   const copy = () => {
     navigator.clipboard.writeText(code);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const download = () => {
+    const blob = new Blob([code], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename ?? label;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="rounded-xl overflow-hidden border border-slate-700">
-      <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-700">
-        <span className="text-xs text-slate-400 font-mono">{label}</span>
-        <button
-          onClick={copy}
-          className={`text-xs px-3 py-1 rounded transition-all ${
-            copied
-              ? "bg-green-500/20 text-green-400 border border-green-500/30"
-              : "bg-slate-800 text-slate-400 hover:text-blue-400 border border-slate-700 hover:border-blue-500/50"
-          }`}
-        >
-          {copied ? "✅ コピー済み" : "📋 コピー"}
-        </button>
+    <div className="space-y-3">
+      <div className="rounded-xl overflow-hidden border border-slate-700">
+        <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-700">
+          <span className="text-xs text-slate-400 font-mono">{label}</span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={download}
+              className="text-xs px-3 py-1 rounded transition-all bg-slate-800 text-slate-400 hover:text-green-400 border border-slate-700 hover:border-green-500/50"
+            >
+              ⬇️ DL
+            </button>
+            <button
+              onClick={copy}
+              className={`text-xs px-3 py-1 rounded transition-all ${
+                copied
+                  ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                  : "bg-slate-800 text-slate-400 hover:text-blue-400 border border-slate-700 hover:border-blue-500/50"
+              }`}
+            >
+              {copied ? "✅ コピー済み" : "📋 コピー"}
+            </button>
+          </div>
+        </div>
+        <pre className="p-4 text-xs font-mono text-slate-300 overflow-x-auto max-h-64 leading-relaxed bg-[#0a0f1e]">
+          {code}
+        </pre>
       </div>
-      <pre className="p-4 text-xs font-mono text-slate-300 overflow-x-auto max-h-64 leading-relaxed bg-[#0a0f1e]">
-        {code}
-      </pre>
+
+      {/* 推奨文言 */}
+      <div className="flex items-start gap-3 bg-blue-500/5 border border-blue-500/20 rounded-xl px-4 py-3">
+        <span className="text-lg mt-0.5 shrink-0">💡</span>
+        <div>
+          <p className="text-xs font-semibold text-blue-300 mb-0.5">次回スキャンを高速化するヒント</p>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            この <code className="bg-slate-800 text-blue-300 px-1 rounded font-mono">{label}</code> をプロジェクトのルートフォルダに保存しておくと、
+            次回スキャン時に技術スタックが即座に検出され、解析が高速になります。
+            <strong className="text-slate-300"> ⬇️ DL してフォルダ直下に置くことをおすすめします。</strong>
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
 
 function ActionPrompts({ report }: { report: string }) {
   const [copied, setCopied] = useState<number | null>(null);
-  
+
   const actionSection = report.split("### 🎯 次のアクション")[1] || "";
   const actions = actionSection
     .split("\n")
@@ -193,8 +232,130 @@ function ActionPrompts({ report }: { report: string }) {
   );
 }
 
+// ③ フォローアップ質問
+function FollowUpChat({
+  result,
+  aiReport,
+}: {
+  result: ScanResult;
+  aiReport: string;
+}) {
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<Array<{ q: string; a: string }>>([]);
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [history, loading]);
+
+  const handleSubmit = async () => {
+    const q = input.trim();
+    if (!q || loading) return;
+
+    const apiKey = getGeminiApiKey();
+    if (!apiKey) {
+      setError("AIに質問するにはGemini APIキーを設定してください（ヘッダーの🔑ボタン）");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setInput("");
+
+    try {
+      const techStack = result.analysis.stack.map(n => n.name).join(", ");
+      const res = await fetch("/api/ai-followup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Gemini-Api-Key": apiKey },
+        body: JSON.stringify({
+          question: q,
+          projectName: result.projectName,
+          techStack,
+          originalReport: aiReport,
+          history,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "質問の処理に失敗しました");
+      }
+
+      const json = await res.json();
+      setHistory(prev => [...prev, { q, a: json.answer }]);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "エラーが発生しました");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="mt-8 pt-6 border-t border-slate-800">
+      <h4 className="text-sm font-bold text-slate-200 mb-4 flex items-center gap-2">
+        <span className="text-cyan-400">💬</span> AIにさらに質問する
+      </h4>
+
+      {history.length > 0 && (
+        <div className="space-y-4 mb-4">
+          {history.map((msg, i) => (
+            <div key={i} className="space-y-2">
+              <div className="flex justify-end">
+                <div className="max-w-[80%] bg-blue-600/20 border border-blue-500/30 rounded-xl rounded-br-sm px-4 py-2.5">
+                  <p className="text-sm text-blue-200">{msg.q}</p>
+                </div>
+              </div>
+              <div className="flex justify-start">
+                <div className="max-w-[90%] bg-slate-900/70 border border-slate-700 rounded-xl rounded-bl-sm px-4 py-3">
+                  <MarkdownReport text={msg.a} />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {loading && (
+        <div className="flex items-center gap-3 px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-xl mb-4">
+          <span className="animate-pulse text-purple-400">🤖</span>
+          <p className="text-sm text-slate-400">AIが考えています...</p>
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-500/5 border border-red-500/20 rounded-xl text-xs text-red-400">
+          {error}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <textarea
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleSubmit();
+          }}
+          placeholder="例：Supabaseでデータベースを追加したい場合、何から始めればいいですか？"
+          rows={2}
+          className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500 resize-none"
+        />
+        <button
+          onClick={handleSubmit}
+          disabled={!input.trim() || loading}
+          className="shrink-0 px-4 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 text-white text-sm font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+        >
+          送信
+        </button>
+      </div>
+      <p className="text-[10px] text-slate-600 mt-1.5 text-right">Cmd/Ctrl + Enter でも送信できます</p>
+      <div ref={bottomRef} />
+    </div>
+  );
+}
+
 function FutureTree({ report, currentTree = "" }: { report: string; currentTree?: string }) {
-  // パースロジックの強化: 正規表現で複数のキーワードに対応
   const extractSection = (text: string, keywords: string[]) => {
     for (const keyword of keywords) {
       const regex = new RegExp(`${keyword}[\\s\\S]*?(?=###|---|$|##)`, "i");
@@ -247,7 +408,6 @@ function FutureTree({ report, currentTree = "" }: { report: string; currentTree?
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* 現状のツリー */}
         <div className="bg-[#050a14] border border-slate-800 rounded-xl overflow-hidden opacity-60 grayscale-[0.5] hover:grayscale-0 transition-all">
           <div className="px-4 py-2 border-b border-slate-800 bg-slate-900/50 flex items-center justify-between">
             <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">📁 現状のファイル構成</span>
@@ -258,7 +418,6 @@ function FutureTree({ report, currentTree = "" }: { report: string; currentTree?
           </pre>
         </div>
 
-        {/* 未来のツリー */}
         <div className="bg-[#050a14] border border-cyan-500/30 rounded-xl overflow-hidden shadow-[0_0_20px_rgba(6,182,212,0.1)]">
           <div className="px-4 py-2 border-b border-cyan-500/20 bg-cyan-500/5 flex items-center justify-between">
             <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">🔮 未来の構成（AI提案）</span>
@@ -299,12 +458,31 @@ function FutureTree({ report, currentTree = "" }: { report: string; currentTree?
   );
 }
 
-function FileCard({ file }: { file: FileAnalysis }) {
+// ② VibeDiff連携：ファイル内容をコピーしてVibeDiffを開く
+function FileCard({ file, content }: { file: FileAnalysis; content?: string }) {
   const [open, setOpen] = useState(true);
+  const [toast, setToast] = useState<string | null>(null);
   const baseName = file.filename.split("/").pop() ?? file.filename;
 
+  const handleVibeDiff = (e: { stopPropagation: () => void }) => {
+    e.stopPropagation();
+    if (content) {
+      navigator.clipboard.writeText(content);
+      setToast("📋 コピーしました。VibeDiffにペーストしてください");
+    } else {
+      setToast("💡 VibeDiffを開きます（フォルダをスキャンしてチェック）");
+    }
+    setTimeout(() => setToast(null), 3000);
+    window.open("https://oyajibuki.github.io/diff/", "_blank", "noopener,noreferrer");
+  };
+
   return (
-    <div className="border border-slate-700/60 rounded-xl overflow-hidden">
+    <div className="border border-slate-700/60 rounded-xl overflow-hidden relative">
+      {toast && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-slate-800 border border-slate-600 text-slate-200 text-xs px-4 py-2 rounded-full shadow-lg whitespace-nowrap animate-fade-in-up">
+          {toast}
+        </div>
+      )}
       <button
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between px-4 py-3 bg-slate-900/60 hover:bg-slate-800/60 transition-colors text-left"
@@ -319,15 +497,12 @@ function FileCard({ file }: { file: FileAnalysis }) {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <a
-            href="https://oyajibuki.github.io/diff/"
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
+          <button
+            onClick={handleVibeDiff}
             className="text-[10px] bg-slate-800 text-slate-400 hover:text-cyan-400 border border-slate-700 px-2 py-0.5 rounded transition-colors"
           >
-            VibeDiffでチェック
-          </a>
+            {content ? "📋 コピー→VibeDiff" : "VibeDiffでチェック"}
+          </button>
           <span className={`text-slate-500 text-xs transition-transform ${open ? "rotate-90" : ""}`}>▶</span>
         </div>
       </button>
@@ -369,6 +544,7 @@ export default function ResultsPanel({
   codeAnalysisLoading,
   codeAnalysisError,
   onCodeAnalyze,
+  coreFileContents,
 }: Props) {
   const { analysis, pattern } = result;
   const [activeTab, setActiveTab] = useState<TabId>("similar");
@@ -383,6 +559,16 @@ export default function ResultsPanel({
     { id: "code", label: "🔍 コード解析", show: hasCoreFiles },
     { id: "ai", label: "🤖 AI深層評価", show: true },
   ];
+
+  // ② ファイル名からコンテンツを引く（末尾一致でフォールバック）
+  const findContent = (filename: string): string | undefined => {
+    if (!coreFileContents) return undefined;
+    if (coreFileContents[filename]) return coreFileContents[filename];
+    const key = Object.keys(coreFileContents).find(k =>
+      k === filename || k.endsWith("/" + filename) || filename.endsWith("/" + k.split("/").pop()!)
+    );
+    return key ? coreFileContents[key] : undefined;
+  };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -483,20 +669,22 @@ export default function ResultsPanel({
             </div>
           )}
 
+          {/* ① 自動生成ファイル */}
           {activeTab === "generated" && (
-            <div className="space-y-4 animate-fade-in-up">
+            <div className="space-y-6 animate-fade-in-up">
               {analysis.generatedSetupNotes && (
-                <CopyableCode code={analysis.generatedSetupNotes} label="SETUP.md" />
+                <CopyableCode code={analysis.generatedSetupNotes} label="SETUP.md" filename="SETUP.md" />
               )}
               {analysis.generatedPackageJson && (
-                <CopyableCode code={analysis.generatedPackageJson} label="package.json" />
+                <CopyableCode code={analysis.generatedPackageJson} label="package.json" filename="package.json" />
               )}
               {analysis.generatedRequirements && (
-                <CopyableCode code={analysis.generatedRequirements} label="requirements.txt" />
+                <CopyableCode code={analysis.generatedRequirements} label="requirements.txt" filename="requirements.txt" />
               )}
             </div>
           )}
 
+          {/* ② コード解析 */}
           {activeTab === "code" && (
             <div className="animate-fade-in-up">
               {!codeAnalysis && !codeAnalysisLoading && (
@@ -523,7 +711,7 @@ export default function ResultsPanel({
                   </div>
                   <p className="text-slate-400 text-xs leading-relaxed">
                     {codeAnalysisError.includes("429") || codeAnalysisError.includes("quota")
-                      ? "無料枠のリクエスト上限に達しました。数分〜数時間待ってから再度お試しください。AI Studioでプランを確認することもできます。"
+                      ? "無料枠のリクエスト上限に達しました。数分〜数時間待ってから再度お試しください。"
                       : "リクエストが集中しているため、処理を完了できませんでした。再度ボタンを押してください。"}
                   </p>
                 </div>
@@ -531,13 +719,14 @@ export default function ResultsPanel({
               {codeAnalysis && (
                 <div className="space-y-3">
                   {codeAnalysis.map((file, i) => (
-                    <FileCard key={i} file={file} />
+                    <FileCard key={i} file={file} content={findContent(file.filename)} />
                   ))}
                 </div>
               )}
             </div>
           )}
 
+          {/* ③ AI深層評価 */}
           {activeTab === "ai" && (
             <div className="animate-fade-in-up">
               {!aiReport && !aiLoading && (
@@ -564,7 +753,7 @@ export default function ResultsPanel({
                   </div>
                   <p className="text-slate-400 text-xs leading-relaxed">
                     {aiError.includes("429") || aiError.includes("quota")
-                      ? "Gemini API のクォータ制限（回数制限）にかかっています。無料枠の上限に達した可能性があるため、しばらく待ってから再度お試しください。"
+                      ? "Gemini API のクォータ制限にかかっています。しばらく待ってから再度お試しください。"
                       : aiError}
                   </p>
                 </div>
@@ -593,6 +782,7 @@ export default function ResultsPanel({
                     <div className="bg-slate-900/50 rounded-xl p-5 border border-slate-800/50">
                       <MarkdownReport text={aiReport} />
                       <ActionPrompts report={aiReport} />
+                      <FollowUpChat result={result} aiReport={aiReport} />
                     </div>
                   ) : (
                     <FutureTree report={aiReport} currentTree={result.fileTree} />

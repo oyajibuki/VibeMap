@@ -277,6 +277,7 @@ export default function Home() {
               codeAnalysisLoading={codeAnalysisLoading}
               codeAnalysisError={codeAnalysisError}
               onCodeAnalyze={handleCodeAnalyze}
+              coreFileContents={coreFileContents ?? undefined}
             />
           </div>
         )}
