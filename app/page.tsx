@@ -19,6 +19,7 @@ const DEMO_CODE_ANALYSIS: FileAnalysis[] = [
       "Stripeの課金フローをトリガーするCTAを実装",
       "lucide-reactでアイコンを配置したナビゲーションを構成",
     ],
+    highlight: "認証・決済・UIが1ファイルに集中しているため、機能追加でコンポーネント分割を推奨",
   },
   {
     filename: "vite.config.js",
@@ -28,6 +29,7 @@ const DEMO_CODE_ANALYSIS: FileAnalysis[] = [
       "Hot Module Replacement（HMR）を自動で有効化",
       "本番ビルド時のコード最適化を定義",
     ],
+    highlight: "最小構成で安全。path alias（@/）を追加するとimportが整理される",
   },
   {
     filename: "tailwind.config.js",
@@ -36,6 +38,7 @@ const DEMO_CODE_ANALYSIS: FileAnalysis[] = [
       "content: ['./src/**/*.{js,jsx}'] でスキャン範囲を限定",
       "テーマ拡張でカスタムカラー・フォントを追加可能",
     ],
+    highlight: "標準的な設定。カスタムカラーを追加する場合はtheme.extend内で定義する",
   },
 ];
 
