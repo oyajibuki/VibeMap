@@ -5,6 +5,10 @@ export const metadata: Metadata = {
   title: "VibeMap — アーキテクチャ可視化ツール",
   description: "プロジェクトのフォルダ構造と依存関係を解析して、システム全体のアーキテクチャ図を自動生成します。",
   keywords: ["architecture", "visualization", "tech stack", "diagram", "vibe coding"],
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+  },
   openGraph: {
     title: "VibeMap",
     description: "コードを読み込むだけでアーキテクチャ図を自動生成",

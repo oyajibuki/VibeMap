@@ -17,6 +17,7 @@ interface Props {
   codeAnalysisError: string | null;
   onCodeAnalyze: () => void;
   coreFileContents?: Record<string, string>;
+  isDemo?: boolean;
 }
 
 function ScoreBar({ score }: { score: number }) {
@@ -545,6 +546,7 @@ export default function ResultsPanel({
   codeAnalysisError,
   onCodeAnalyze,
   coreFileContents,
+  isDemo,
 }: Props) {
   const { analysis, pattern } = result;
   const [activeTab, setActiveTab] = useState<TabId>("similar");
@@ -645,21 +647,12 @@ export default function ResultsPanel({
               {pattern.similarServices.map((service, i) => (
                 <div
                   key={i}
-                  className={`border rounded-xl p-4 transition-all hover:scale-[1.01] ${
-                    service.isYourApp
-                      ? "border-blue-700/60 bg-blue-500/5 shadow-[0_0_10px_rgba(59,130,246,0.1)]"
-                      : "border-slate-800 bg-slate-900/50 hover:border-slate-700"
-                  }`}
+                  className="border rounded-xl p-4 transition-all hover:scale-[1.01] border-slate-800 bg-slate-900/50 hover:border-slate-700"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-semibold text-slate-200 text-sm">{service.name}</span>
-                        {service.isYourApp && (
-                          <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded-full text-xs border border-blue-500/30">
-                            ✨ あなたのアプリ
-                          </span>
-                        )}
                       </div>
                       <p className="text-xs text-slate-500 leading-relaxed">{service.description}</p>
                     </div>
@@ -718,6 +711,17 @@ export default function ResultsPanel({
               )}
               {codeAnalysis && (
                 <div className="space-y-3">
+                  {isDemo && (
+                    <div className="flex items-start gap-3 bg-amber-500/5 border border-amber-500/20 rounded-xl px-4 py-3 mb-2">
+                      <span className="text-lg shrink-0">🎭</span>
+                      <div>
+                        <p className="text-xs font-semibold text-amber-400 mb-0.5">サンプル表示</p>
+                        <p className="text-xs text-slate-400 leading-relaxed">
+                          これはデモ用のサンプル解析結果です。実際のコード解析には <strong className="text-slate-300">Gemini APIキー</strong> の設定が必要です（ヘッダーの🔑ボタン）。
+                        </p>
+                      </div>
+                    </div>
+                  )}
                   {codeAnalysis.map((file, i) => (
                     <FileCard key={i} file={file} content={findContent(file.filename)} />
                   ))}
@@ -780,6 +784,17 @@ export default function ResultsPanel({
                   </div>
                   {aiTab === "report" ? (
                     <div className="bg-slate-900/50 rounded-xl p-5 border border-slate-800/50">
+                      {isDemo && (
+                        <div className="flex items-start gap-3 bg-amber-500/5 border border-amber-500/20 rounded-xl px-4 py-3 mb-5">
+                          <span className="text-lg shrink-0">🎭</span>
+                          <div>
+                            <p className="text-xs font-semibold text-amber-400 mb-0.5">サンプル表示</p>
+                            <p className="text-xs text-slate-400 leading-relaxed">
+                              これはデモ用のサンプル評価レポートです。実際のAI深層評価には <strong className="text-slate-300">Gemini APIキー</strong> の設定が必要です（ヘッダーの🔑ボタン）。
+                            </p>
+                          </div>
+                        </div>
+                      )}
                       <MarkdownReport text={aiReport} />
                       <ActionPrompts report={aiReport} />
                       <FollowUpChat result={result} aiReport={aiReport} />

@@ -14,8 +14,8 @@ export interface AnalysisData {
   requirementsTxt?: string;
   fileList: string[];
   rawDeps: string[];
-  // コアファイルの内容 (import文などから検出するため)
   coreFileContents?: Record<string, string>;
+  isDemo?: boolean;
 }
 
 export interface AnalysisResult {

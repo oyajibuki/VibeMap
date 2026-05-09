@@ -2,8 +2,6 @@ export interface SimilarService {
   name: string;
   description: string;
   url?: string;
-  isYourApp?: boolean;
-  appName?: string;
 }
 
 export interface PatternMatch {
@@ -14,17 +12,10 @@ export interface PatternMatch {
   scalabilityScore: number;
 }
 
-// Pre-seeded with the developer's own apps for personalized matching
 const PATTERN_DB: Record<string, PatternMatch> = {
   "python-saas": {
     patternName: "Python SaaS (Streamlit + Supabase + Stripe)",
     similarServices: [
-      {
-        name: "OshiPay",
-        description: "あなた自身が作ったアプリと同じ構成です！Streamlit + Supabase + Stripeの組み合わせで実績あり。",
-        isYourApp: true,
-        appName: "OshiPay",
-      },
       {
         name: "Carrd",
         description: "Pythonベースの軽量SaaSと類似したシンプルなワンページサービス構成。",
@@ -48,18 +39,6 @@ const PATTERN_DB: Record<string, PatternMatch> = {
   "python-data-app": {
     patternName: "Pythonデータアプリ (Streamlit + Supabase)",
     similarServices: [
-      {
-        name: "FitSign",
-        description: "あなた自身が作ったアプリと同じ構成！Streamlit + Supabase + PDFで実績あり。",
-        isYourApp: true,
-        appName: "FitSign",
-      },
-      {
-        name: "OshiPay",
-        description: "同様のStreamlit + Supabase構成。決済機能を追加した発展形。",
-        isYourApp: true,
-        appName: "OshiPay",
-      },
       {
         name: "Retool",
         description: "内部ツール構築に特化したStreamlit類似のローコードツール。",
@@ -96,12 +75,6 @@ const PATTERN_DB: Record<string, PatternMatch> = {
   "react-baas": {
     patternName: "React SPA + BaaS (Supabase/Firebase)",
     similarServices: [
-      {
-        name: "TuneDrop",
-        description: "あなた自身が作ったアプリと同じ構成！React + Vite + Supabase + Tailwindで実績あり。",
-        isYourApp: true,
-        appName: "TuneDrop",
-      },
       {
         name: "Twitter / X",
         description: "リアルタイムフィード + ユーザー認証の構成が類似。Supabaseがリアルタイム対応なのが強み。",
@@ -149,12 +122,6 @@ const PATTERN_DB: Record<string, PatternMatch> = {
     patternName: "ハイブリッドモバイル (React + Capacitor)",
     similarServices: [
       {
-        name: "TuneDrop App",
-        description: "あなた自身が作ったアプリと同じ構成！React + Capacitor + Supabase で実績あり。",
-        isYourApp: true,
-        appName: "TuneDrop App",
-      },
-      {
         name: "Ionic Framework Apps",
         description: "Capacitorを使ったハイブリッドアプリの最大手エコシステム。",
         url: "https://ionicframework.com",
@@ -191,12 +158,6 @@ const PATTERN_DB: Record<string, PatternMatch> = {
     patternName: "シングルページアプリ (React SPA)",
     similarServices: [
       {
-        name: "VibeDiff",
-        description: "あなた自身が作ったツールと同じ構成！React + Vite のシンプルなSPA。",
-        isYourApp: true,
-        appName: "VibeDiff",
-      },
-      {
         name: "Netlify Drop",
         description: "シンプルなSPAのホスティングに最適。ドラッグ&ドロップでデプロイ可能。",
         url: "https://netlify.com",
@@ -205,6 +166,11 @@ const PATTERN_DB: Record<string, PatternMatch> = {
         name: "CodeSandbox",
         description: "React SPAの典型例。軽量で高速なフロントエンドツール。",
         url: "https://codesandbox.io",
+      },
+      {
+        name: "StackBlitz",
+        description: "ブラウザ上で動くReact SPA開発環境。Viteと相性が良い。",
+        url: "https://stackblitz.com",
       },
     ],
     strengths: ["シンプルで高速なフロントエンド", "Viteで高速なHMRとビルド", "デプロイが容易（静的ホスティング可）"],
@@ -233,18 +199,6 @@ const PATTERN_DB: Record<string, PatternMatch> = {
     patternName: "SwiftUI iOSアプリ (StoreKit課金 + iCloud同期)",
     similarServices: [
       {
-        name: "UndoQuest",
-        description: "あなた自身が作ったアプリと同じ構成！SwiftUI + StoreKit + iCloud KV の実績あり。",
-        isYourApp: true,
-        appName: "UndoQuest",
-      },
-      {
-        name: "DanshuQuest",
-        description: "同じシリーズのあなたのアプリ。同一の技術構成。",
-        isYourApp: true,
-        appName: "DanshuQuest",
-      },
-      {
         name: "Streaks",
         description: "習慣トラッカーの代表例。SwiftUI + StoreKit + iCloudの構成が類似。",
         url: "https://apps.apple.com/app/streaks/id963034692",
@@ -265,25 +219,17 @@ const PATTERN_DB: Record<string, PatternMatch> = {
       "StoreKitで月額/年額/買い切りの3プランを柔軟に実装",
       "iCloud KVでデバイス間同期がサーバー不要で実現",
       "SwiftUIでコード量を大幅削減しつつ高品質なUIを実現",
-      "UserDefaultsで軽量なローカル永続化",
     ],
     considerations: [
       "サーバーサイドのバリデーションがないためレシート検証を必ず実装すること",
       "iCloud KVはストレージ上限(1MB)に注意。大量データはCloudKitへ移行を検討",
       "StoreKit 2 (iOS 15+) への移行でサブスクリプション管理が大幅に簡素化される",
-      "TestFlightでのIAP動作確認はSandbox環境で必ず事前テストすること",
     ],
     scalabilityScore: 7,
   },
   "ios-swiftui-iap": {
     patternName: "SwiftUI iOSアプリ (StoreKit課金あり)",
     similarServices: [
-      {
-        name: "UndoQuest",
-        description: "あなた自身が作ったアプリと類似！SwiftUI + StoreKit 構成。",
-        isYourApp: true,
-        appName: "UndoQuest",
-      },
       {
         name: "Bear",
         description: "SwiftUI + プレミアム課金の成功例。シンプルなUIと課金モデル。",
